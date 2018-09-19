@@ -1,0 +1,17 @@
+{
+  "api": {
+    "appid": "7",
+    "key": "hZ4AaYcVw599s9we",
+    "url": "ws://127.0.0.1/robot",
+    "origin": "http://127.0.0.1"
+  },
+  "local": {
+    "robot_voice_path": "./data/voice/",
+    "user_voice_path": "./data/audio/"
+  },
+  "asr": {
+    "appid": "5b6133f5",
+    "key": "e5c6614060b2a69ae57838555d9fcddd"
+  }
+}
+
