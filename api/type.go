@@ -12,7 +12,7 @@ type Api struct {
 	apiUrl string
 	origin string
 	lockWs sync.Mutex
-	ws   *websocket.Conn
+	ws     *websocket.Conn
 	app    App
 }
 
@@ -27,12 +27,18 @@ type App struct {
 	lockTask     sync.Mutex
 	users        map[string]*User
 	lockUser     sync.Mutex
+	taskInfo     *TaskInfo
+}
+
+type TaskInfo struct {
+	TaskSim map[int][]int // map[simId][]taskId
+	TaskSip map[int][]int
 }
 
 type Result struct {
-	Action  string `json:"action"`
-	Code    int    `json:"code"`
-	Data string `json:"data"`
+	Action string `json:"action"`
+	Code   int    `json:"code"`
+	Data   string `json:"data"`
 }
 
 type User struct {
@@ -92,4 +98,3 @@ type WorkTime struct {
 	Schedule   []Schedule `json:"schedule"`
 	UpdateTime time.Time
 }
-

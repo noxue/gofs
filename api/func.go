@@ -27,6 +27,10 @@ func New(apiUrl, origin, appid, key string) *Api {
 			templates: make(map[int]*Template),
 			tasks:     make(map[int]*Task),
 			users:     make(map[string]*User),
+			taskInfo: &TaskInfo{
+				TaskSim:make(map[int][]int),
+				TaskSip:make(map[int][]int),
+			},
 		},
 	}
 
@@ -248,7 +252,24 @@ func (this *Api) tasksUpdate(result *Result) {
 	this.app.lockTask.Lock()
 	defer this.app.lockTask.Unlock()
 
+	sim_id,ok1:=m["sim_id"].(int)
+	if !ok1 {
+		sim_id = 0
+	}
+
+	sip_id, ok2:=m["sip_id"].(int)
+
+	if !ok1 && !ok2 {
+		return
+	}
+
+
 	for _,task:= range tasks {
+		if sim_id>0 {
+			this.app.taskInfo.TaskSim[task.Id] = append(this.app.taskInfo.TaskSim[task.Id],sim_id)
+		} else if sip_id>0{
+			this.app.taskInfo.TaskSip[task.Id] = append(this.app.taskInfo.TaskSip[task.Id],sip_id)
+		}
 		this.app.tasks[task.Id] = &task
 		glog.V(3).Infoln(*(this.app.tasks[task.Id]))
 		glog.V(1).Infoln("task update success, task id:", task.Id)
