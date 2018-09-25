@@ -4,14 +4,10 @@ import (
 	"gofs/phone"
 	"fmt"
 	"math/rand"
-
 	"time"
 )
 
-
-
 type EndPoint struct {
-
 }
 
 func (this *EndPoint) Create(call *phone.Call) {
@@ -19,7 +15,7 @@ func (this *EndPoint) Create(call *phone.Call) {
 }
 
 func (this *EndPoint) Answer(call *phone.Call) {
-	call.Play("d:/a1.wav")
+	call.Play("d:/0012.wav")
 }
 
 func (this *EndPoint) Hangup(call *phone.Call) {
@@ -32,22 +28,29 @@ func (this *EndPoint) Destroy(call *phone.Call) {
 
 func (this *EndPoint) SpeakStart(call *phone.Call) {
 	call.Pause(true)
-	call.Record(fmt.Sprintf("d:/%s.wav",rand.Intn(100000)))
+	call.Record(fmt.Sprintf("d:/%s.wav", rand.Intn(100000)))
 }
 
 func (this *EndPoint) SpeakEnd(call *phone.Call) {
 	call.Stop()
-	wav,_:=call.RecordStop()
+	wav, _ := call.RecordStop()
 	call.Play(wav)
-	fmt.Println(call.GetDataString("word"),call.GetDataString("file"))
+	fmt.Println(call.GetDataString("word"), call.GetDataString("file"))
 }
 
 func main() {
 	go Api.Handle()
-	time.Sleep(time.Second)
-	Api.SipTasks(1)
-	for  {
-		time.Sleep(time.Millisecond)
+	time.Sleep(time.Second*3)
+	for {
+		tasks := Api.Tasks()
+		for id, _ := range tasks {
+			//fmt.Println("----",id)
+			Api.TaskUser(id)
+		}
+		time.Sleep(time.Millisecond * 1000)
+	}
+	for {
+		time.Sleep(time.Second)
 	}
 }
 

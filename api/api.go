@@ -58,6 +58,15 @@ func (this *Api)SipTasks(id int) {
 	this.update("sip_tasks", strconv.Itoa(id))
 }
 
+func (this *Api)TaskUser(taskId int) {
+	this.update("task_user", strconv.Itoa(taskId))
+}
+
+func (this *Api)Tasks() map[int]*Task{
+	this.app.lockTask.Lock()
+	this.app.lockTask.Unlock()
+	return this.app.tasks
+}
 
 //
 //func (this *Api) GetGateways() (gateways []Gateway) {

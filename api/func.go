@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/websocket"
 	"time"
 	"strconv"
+	"fmt"
 )
 
 func New(apiUrl, origin, appid, key string) *Api {
@@ -73,6 +74,11 @@ func (this *Api) Handle() {
 			continue
 		}
 
+		if (result.Code != 0){
+			glog.Error(result.Data)
+			return
+		}
+
 		switch result.Action {
 		case "NotAuth":
 			this.notAuth(&result)
@@ -96,6 +102,8 @@ func (this *Api) Handle() {
 			this.taskUpdate(&result)
 		case "TasksUpdate":
 			this.tasksUpdate(&result)
+		case "TaskUserUpdate":
+			this.taskUserUpdate(&result)
 		case "TaskDelete":
 			this.taskDelete(&result)
 		case "WorkTimeUpdate":
@@ -249,20 +257,21 @@ func (this *Api) tasksUpdate(result *Result) {
 		return
 	}
 
-	this.app.lockTask.Lock()
-	defer this.app.lockTask.Unlock()
-
-	sim_id,ok1:=m["sim_id"].(int)
-	if !ok1 {
-		sim_id = 0
+	sim_id:=0
+	if _,ok:=m["sim_id"]; ok{
+		sim_id=int(m["sim_id"].(float64))
 	}
-
-	sip_id, ok2:=m["sip_id"].(int)
-
-	if !ok1 && !ok2 {
+	sip_id:=0
+	if _,ok:=m["sip_id"]; ok{
+		sip_id=int(m["sip_id"].(float64))
+	}
+	if sim_id==0 && sip_id==0 {
+		glog.Error("sim_id and sip_id is invalid")
 		return
 	}
 
+	this.app.lockTask.Lock()
+	defer this.app.lockTask.Unlock()
 
 	for _,task:= range tasks {
 		if sim_id>0 {
@@ -287,6 +296,17 @@ func (this *Api) taskDelete(result *Result) {
 	delete(this.app.tasks, id)
 	glog.V(1).Infoln("delete task id:" + result.Data)
 }
+
+func (this *Api) taskUserUpdate(result *Result) {
+	var taskUser TaskUser
+	err:= json.Unmarshal([]byte(result.Data), &taskUser)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
+	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user:%d", taskUser.TaskId,taskUser.Id))
+}
+
 
 func (this *Api) workTimeUpdate(result *Result) {
 
