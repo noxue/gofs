@@ -1,4 +1,4 @@
-package phone
+package fs
 
 import (
 	"errors"
@@ -49,14 +49,34 @@ func NewCall(number string,callInterface CallInterface,timeout time.Duration) *C
 	}
 }
 
-func (this *Phone) MakeCall(gateway string, call *Call) (err error) {
+func (this *Phone) MakeSipCall(gateway string, call *Call) (err error) {
 	if len(gateway) == 0 || len(call.GetNumber()) == 0 {
 		err = errors.New("gateway or number is empty")
 		return
 	}
 	call.client = this.client
 	this.calls.Set(call.GetNumber(), call)
-	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=false,absolute_codec_string=pcma,origination_caller_id_number=" + gateway + "}sofia/gateway/" + gateway + "/" + call.GetNumber() + " 'ai:asdfaf' inline"))
+	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + gateway + "}sofia/gateway/" + gateway + "/" + call.GetNumber() + " 'ai:asdfaf' inline"))
+	return
+}
+
+func (this *Phone) MakeSimCall(from string, call *Call) (err error) {
+	if len(call.GetNumber()) == 0 {
+		err = errors.New("gateway or number is empty")
+		return
+	}
+	call.client = this.client
+	this.calls.Set(call.GetNumber(), call)
+	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + from + "}sofia/internal/sip:"  + call.GetNumber() + " 'ai:asdfaf' inline"))
+	return
+}
+
+func (this *Call) Hungup() (err error) {
+	if len(this.GetUuid()) == 0 {
+		err = errors.New("uuid is empty")
+		return
+	}
+	this.client.BgApi("uuid_kill " + this.GetUuid())
 	return
 }
 
@@ -129,6 +149,7 @@ func (this *Call) Pause(on bool) (err error) {
 	return
 }
 
+// stop to send audio
 func (this *Call) Stop() (err error) {
 	if len(this.GetUuid()) == 0 {
 		err = errors.New("uuid is empty")

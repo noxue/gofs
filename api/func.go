@@ -60,7 +60,7 @@ func (this *Api) Handle() {
 
 		copy(data[len:], msg[:n])
 		len += n
-		if n < 4 || "\r\n\r\n" != string(msg[n-4:n]) {
+		if n < 6|| "\r\n\r\n" != string(msg[n-4:n]) {
 			continue
 		}
 		glog.V(3).Infoln(this.GetWs().Len(), n, err, string(data[:len-4]))
@@ -305,6 +305,8 @@ func (this *Api) taskUserUpdate(result *Result) {
 		return
 	}
 	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user:%d", taskUser.TaskId,taskUser.Id))
+
+	
 }
 
 

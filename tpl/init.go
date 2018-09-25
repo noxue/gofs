@@ -1,0 +1,7 @@
+package tpl
+
+
+
+func InitTpl(){
+
+}

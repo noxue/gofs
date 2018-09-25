@@ -12,6 +12,12 @@
   "asr": {
     "appid": "5b6133f5",
     "key": "e5c6614060b2a69ae57838555d9fcddd"
+  },
+  "fs": {
+    "host": "localhost",
+    "port": 8021,
+    "password": "ClueCon",
+    "timeout": 10
   }
 }
 

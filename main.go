@@ -1,67 +1,53 @@
 package main
 
 import (
-	"gofs/phone"
-	"fmt"
-	"math/rand"
+	"gofs/fs"
 	"time"
+	"gofs/service"
+	"os"
+	"os/signal"
+	"fmt"
 )
 
-type EndPoint struct {
-}
-
-func (this *EndPoint) Create(call *phone.Call) {
-
-}
-
-func (this *EndPoint) Answer(call *phone.Call) {
-	call.Play("d:/0012.wav")
-}
-
-func (this *EndPoint) Hangup(call *phone.Call) {
-
-}
-
-func (this *EndPoint) Destroy(call *phone.Call) {
-
-}
-
-func (this *EndPoint) SpeakStart(call *phone.Call) {
-	call.Pause(true)
-	call.Record(fmt.Sprintf("d:/%s.wav", rand.Intn(100000)))
-}
-
-func (this *EndPoint) SpeakEnd(call *phone.Call) {
-	call.Stop()
-	wav, _ := call.RecordStop()
-	call.Play(wav)
-	fmt.Println(call.GetDataString("word"), call.GetDataString("file"))
-}
+//func main() {
+//	go Api.Handle()
+//	time.Sleep(time.Second*3)
+//	for {
+//		tasks := Api.Tasks()
+//		for id, _ := range tasks {
+//			Api.TaskUser(id)
+//		}
+//		time.Sleep(time.Millisecond * 10)
+//	}
+//	for {
+//		time.Sleep(time.Second)
+//	}
+//}
 
 func main() {
-	go Api.Handle()
-	time.Sleep(time.Second*3)
-	for {
-		tasks := Api.Tasks()
-		for id, _ := range tasks {
-			//fmt.Println("----",id)
-			Api.TaskUser(id)
-		}
-		time.Sleep(time.Millisecond * 1000)
-	}
+	call := fs.NewCall("13101907101@192.168.4.102", &service.EndPoint{}, time.Minute*5)
+	fs.Fs.MakeSimCall("19a", call)
 	for {
 		time.Sleep(time.Second)
 	}
+
+	waitClose()
 }
 
-//
-//func main() {
-//	p, err := phone.New("localhost", 8021, "ClueCon", 10)
-//	if err != nil {
-//		glog.Error(err)
-//	}
-//
-//	call:=phone.NewCall("13758277505",&EndPoint{},time.Minute*5)
-//	p.MakeCall("xigao", call)
-//	p.Handle()
-//}
+
+func waitClose(){
+	signalChan := make(chan os.Signal, 1)
+	cleanupDone := make(chan bool)
+	signal.Notify(signalChan, os.Interrupt)
+	go func() {
+		for _ = range signalChan {
+			fmt.Println("\n 收到终端信号，停止服务... \n")
+			cleanup()
+			cleanupDone <- true
+		}
+	}()
+	<-cleanupDone
+}
+func cleanup() {
+	fmt.Println("清理...\n")
+}
