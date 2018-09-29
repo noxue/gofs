@@ -1,12 +1,11 @@
 package main
 
 import (
-	"gofs/fs"
-	"time"
-	"gofs/service"
 	"os"
 	"os/signal"
 	"fmt"
+	"gofs/api"
+	"time"
 )
 
 //func main() {
@@ -25,23 +24,39 @@ import (
 //}
 
 func main() {
-	call := fs.NewCall("13101907101@192.168.4.102", &service.EndPoint{}, time.Minute*5)
-	fs.Fs.MakeSimCall("19a", call)
-	for {
-		time.Sleep(time.Second)
-	}
+
+	time.Sleep(time.Second*4)
+	go func() {
+		for {
+			simId := api.TaskApi.GetTaskInfo().GetFreeSim()
+			if simId == 0 {
+				time.Sleep(time.Millisecond * 200)
+				continue
+			}
+			taskId:=api.TaskApi.GetTaskInfo().GetTaskIdBySimid(simId)
+			if taskId == 0 {
+				time.Sleep(time.Millisecond * 200)
+				continue
+			}
+
+			// make a new call success, so set the sim not free
+			api.TaskApi.GetTaskInfo().SimFree(simId, false)
+
+			api.TaskApi.SimTaskUser(simId,taskId)
+			time.Sleep(time.Millisecond*500)
+		}
+	}()
 
 	waitClose()
 }
 
-
-func waitClose(){
+func waitClose() {
 	signalChan := make(chan os.Signal, 1)
 	cleanupDone := make(chan bool)
 	signal.Notify(signalChan, os.Interrupt)
 	go func() {
 		for _ = range signalChan {
-			fmt.Println("\n 收到终端信号，停止服务... \n")
+			fmt.Println("\n 程序结束 \n")
 			cleanup()
 			cleanupDone <- true
 		}
@@ -49,5 +64,5 @@ func waitClose(){
 	<-cleanupDone
 }
 func cleanup() {
-	fmt.Println("清理...\n")
+	api.TaskApi.Close()
 }

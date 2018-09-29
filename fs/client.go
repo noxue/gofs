@@ -16,8 +16,6 @@ type Phone struct {
 	timeout int
 }
 
-
-
 func New(host string, port uint, pass string, timeout int) (client *Phone, err error) {
 	c := &Phone{
 		host:    host,
@@ -37,8 +35,8 @@ func New(host string, port uint, pass string, timeout int) (client *Phone, err e
 func (this *Phone) Handle() {
 	client := this.client
 	go client.Handle()
-	//this.client.Send("events json CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE")
-	this.client.Send("events json CHANNEL_CREATE CHANNEL_ANSWER CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE CUSTOM asr::start_speak asr::end_speak")
+
+	this.client.Send("events json CHANNEL_CREATE CHANNEL_PROGRESS CHANNEL_PROGRESS_MEDIA CHANNEL_ANSWER CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE CUSTOM asr::start_speak asr::end_speak")
 	for {
 		msg, err := client.ReadMessage()
 		if err != nil {
@@ -52,9 +50,15 @@ func (this *Phone) Handle() {
 		glog.V(3).Infoln(msg)
 		uuid := msg.GetHeader("Caller-Unique-ID")
 		eventName := msg.GetHeader("Event-Name")
-		number := msg.GetHeader("Caller-Destination-Number")
+		numberArr := strings.Split(msg.GetHeader("Caller-Destination-Number"),"@")
+		number:=""
+		if len(numberArr)>=1 {
+			number = numberArr[0]
+		} else {
+			continue
+		}
 		call, ok := this.calls.Get(number)
-		glog.V(2).Infoln("Event Name:",eventName, "Number:", number)
+		glog.V(2).Infoln("Event Name:", eventName, "Number:", number)
 		if !ok {
 			continue
 		}
@@ -68,6 +72,10 @@ func (this *Phone) Handle() {
 				call.Hungup()
 			}()
 			call.callInterface.Create(call)
+		case "CHANNEL_PROGRESS":
+			call.callInterface.Progress(call)
+		case "CHANNEL_PROGRESS_MEDIA":
+			call.callInterface.ProgressMedia(call)
 		case "CHANNEL_ANSWER":
 			call.callInterface.Answer(call)
 		case "CHANNEL_DESTROY":
@@ -75,6 +83,7 @@ func (this *Phone) Handle() {
 		case "CHANNEL_HANGUP":
 			call.callInterface.Hangup(call)
 		case "CHANNEL_HANGUP_COMPLETE":
+			call.callInterface.HangupComplete(call)
 		case "asr::start_speak":
 			call.callInterface.SpeakStart(call)
 		case "asr::end_speak":

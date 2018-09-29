@@ -8,6 +8,7 @@ import (
 	"time"
 	"strconv"
 	"fmt"
+	"gofs/fs"
 )
 
 func New(apiUrl, origin, appid, key string) *Api {
@@ -22,15 +23,16 @@ func New(apiUrl, origin, appid, key string) *Api {
 		key:    key,
 		apiUrl: apiUrl,
 		origin: origin,
-		app: *&App{
+		app: &App{
 			gateways:  make(map[int]*Gateway),
 			sims:      make(map[int]*Sim),
 			templates: make(map[int]*Template),
 			tasks:     make(map[int]*Task),
 			users:     make(map[string]*User),
 			taskInfo: &TaskInfo{
-				TaskSim:make(map[int][]int),
-				TaskSip:make(map[int][]int),
+				simTask: make(map[int][]int),
+				sipTask: make(map[int][]int),
+				simFree: make(map[int]bool),
 			},
 		},
 	}
@@ -51,7 +53,9 @@ func (this *Api) Handle() {
 	var len = 0
 	var msg [4096]byte
 	for {
-		n, err := this.GetWs().Read(msg[:])
+		this.lockWs.Lock()
+		n, err := this.ws.Read(msg[:])
+		this.lockWs.Unlock()
 
 		if n == 0 {
 			time.Sleep(time.Millisecond * 500)
@@ -60,10 +64,10 @@ func (this *Api) Handle() {
 
 		copy(data[len:], msg[:n])
 		len += n
-		if n < 6|| "\r\n\r\n" != string(msg[n-4:n]) {
+		if n < 6 || "\r\n\r\n" != string(msg[n-4:n]) {
 			continue
 		}
-		glog.V(3).Infoln(this.GetWs().Len(), n, err, string(data[:len-4]))
+		glog.V(3).Infoln(n, err, string(data[:len-4]))
 
 		var result Result
 		err = json.Unmarshal(data[0:len-4], &result)
@@ -74,7 +78,7 @@ func (this *Api) Handle() {
 			continue
 		}
 
-		if (result.Code != 0){
+		if (result.Code != 0) {
 			glog.Error(result.Data)
 			return
 		}
@@ -158,7 +162,7 @@ func (this *Api) tplDelete(result *Result) {
 func (this *Api) gatewaysUpdate(result *Result) {
 
 	var gateways []*Gateway
-	err:=json.Unmarshal([]byte(result.Data), &gateways)
+	err := json.Unmarshal([]byte(result.Data), &gateways)
 	if err != nil {
 		glog.Error(err)
 		return
@@ -208,6 +212,12 @@ func (this *Api) simUpdate(result *Result) {
 
 	this.app.lockSim.Lock()
 	defer this.app.lockSim.Unlock()
+
+	if _, ok := this.app.sims[sim.Id]; !ok {
+		// record sim to free list
+		this.app.taskInfo.AddFreeSim(sim.Id)
+	}
+
 	this.app.sims[sim.Id] = &sim
 
 	glog.V(3).Infoln(*(this.app.sims[sim.Id]))
@@ -244,7 +254,7 @@ func (this *Api) tasksUpdate(result *Result) {
 
 	m := make(map[string]interface{})
 
-	err:=json.Unmarshal([]byte(result.Data), &m)
+	err := json.Unmarshal([]byte(result.Data), &m)
 	if err != nil {
 		glog.Error("tasks update failed:", err)
 		return
@@ -257,27 +267,27 @@ func (this *Api) tasksUpdate(result *Result) {
 		return
 	}
 
-	sim_id:=0
-	if _,ok:=m["sim_id"]; ok{
-		sim_id=int(m["sim_id"].(float64))
+	sim_id := 0
+	if _, ok := m["sim_id"]; ok {
+		sim_id = int(m["sim_id"].(float64))
 	}
-	sip_id:=0
-	if _,ok:=m["sip_id"]; ok{
-		sip_id=int(m["sip_id"].(float64))
+	sip_id := 0
+	if _, ok := m["sip_id"]; ok {
+		sip_id = int(m["sip_id"].(float64))
 	}
-	if sim_id==0 && sip_id==0 {
+	if sim_id == 0 && sip_id == 0 {
 		glog.Error("sim_id and sip_id is invalid")
 		return
 	}
 
-	this.app.lockTask.Lock()
-	defer this.app.lockTask.Unlock()
+	this.app.lockTaskInfo.Lock()
+	defer this.app.lockTaskInfo.Unlock()
 
-	for _,task:= range tasks {
-		if sim_id>0 {
-			this.app.taskInfo.TaskSim[task.Id] = append(this.app.taskInfo.TaskSim[task.Id],sim_id)
-		} else if sip_id>0{
-			this.app.taskInfo.TaskSip[task.Id] = append(this.app.taskInfo.TaskSip[task.Id],sip_id)
+	for _, task := range tasks {
+		if sim_id > 0 {
+			this.app.taskInfo.simTask[sim_id] = append(this.app.taskInfo.simTask[sim_id], task.Id)
+		} else if sip_id > 0 {
+			this.app.taskInfo.sipTask[sip_id] = append(this.app.taskInfo.sipTask[sip_id], task.Id)
 		}
 		this.app.tasks[task.Id] = &task
 		glog.V(3).Infoln(*(this.app.tasks[task.Id]))
@@ -292,23 +302,59 @@ func (this *Api) taskDelete(result *Result) {
 		return
 	}
 	this.app.lockTask.Lock()
-	this.app.lockTask.Unlock()
+	defer this.app.lockTask.Unlock()
 	delete(this.app.tasks, id)
-	glog.V(1).Infoln("delete task id:" + result.Data)
+
+	glog.V(1).Infoln("delete task id:", id)
+
 }
 
 func (this *Api) taskUserUpdate(result *Result) {
+
+	m := make(map[string]interface{})
+
+	err := json.Unmarshal([]byte(result.Data), &m)
+	if err != nil {
+		glog.Error("task user update failed:", err)
+		return
+	}
+
+	userType := m["type"].(string)
+
 	var taskUser TaskUser
-	err:= json.Unmarshal([]byte(result.Data), &taskUser)
+	err = json.Unmarshal([]byte(m["user"].(string)), &taskUser)
 	if err != nil {
 		glog.Error(err)
 		return
 	}
-	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user:%d", taskUser.TaskId,taskUser.Id))
+	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user id:%d", taskUser.TaskId, taskUser.Id))
+	task := this.app.GetTask(taskUser.TaskId)
+	if task == nil {
+		glog.Error("task is not exists:", taskUser.Id)
+		return
+	}
 
-	
+	if userType == "sim" {
+		simId := int(m["sim_id"].(float64))
+		sim := this.app.GetSim(simId)
+		gateway := this.app.GetGateway(sim.Gid)
+		call := fs.NewCall(taskUser.Mobile, &EndPoint{}, time.Minute*5)
+
+		call.SetData("type", "sim")
+		call.SetData("sim_id", simId)
+
+		err := fs.Fs.MakeSimCall(gateway.Ip, sim.Number, call)
+		if err != nil {
+			glog.Error("make sim call error", err)
+			// make a new call success, so set the sim not free
+			this.app.taskInfo.SimFree(simId, true)
+			return
+		}
+	} else {
+
+	}
+
 }
-
 
 func (this *Api) workTimeUpdate(result *Result) {
 
@@ -434,8 +480,8 @@ func (this *Api) sipThreadUpdate(result *Result) {
 //	}
 //
 //	func() {
-//		this.app.lockSim.Lock()
-//		defer this.app.lockSim.Unlock()
+//		this.app.lockSimFree.Lock()
+//		defer this.app.lockSimFree.Unlock()
 //		for _, s := range _sim.Data["sims"] {
 //			this.app.Sims[s.Id] = s
 //		}

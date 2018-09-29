@@ -13,26 +13,31 @@ type Api struct {
 	origin string
 	lockWs sync.Mutex
 	ws     *websocket.Conn
-	app    App
+	app    *App
 }
 
 type App struct {
-	gateways     map[int]*Gateway
-	lockGateway  sync.Mutex
-	sims         map[int]*Sim
-	lockSim      sync.Mutex
-	templates    map[int]*Template
-	lockTemplate sync.Mutex
-	tasks        map[int]*Task
-	lockTask     sync.Mutex
-	users        map[string]*User
-	lockUser     sync.Mutex
-	taskInfo     *TaskInfo
+	gateways      map[int]*Gateway
+	lockGateway   sync.Mutex
+	sims          map[int]*Sim
+	lockSim       sync.Mutex
+	templates     map[int]*Template
+	lockTemplate  sync.Mutex
+	tasks         map[int]*Task
+	lockTask      sync.Mutex
+	users         map[string]*User
+	lockUser      sync.Mutex
+	taskInfo      *TaskInfo
+	lockTaskInfo sync.Mutex
 }
 
 type TaskInfo struct {
-	TaskSim map[int][]int // map[simId][]taskId
-	TaskSip map[int][]int
+	lockSimTask sync.Mutex
+	simTask     map[int][]int // map[simId][]taskId
+	lockSipTask sync.Mutex
+	sipTask     map[int][]int
+	lockSimFree sync.Mutex
+	simFree     map[int]bool
 }
 
 type Result struct {

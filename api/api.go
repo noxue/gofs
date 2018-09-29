@@ -1,47 +1,46 @@
 package api
 
 import (
-	"golang.org/x/net/websocket"
 	"gofs/config"
 	"github.com/golang/glog"
 	"fmt"
 	"strconv"
 )
 
-func (this *Api) GetWs() *websocket.Conn {
-	this.lockWs.Lock()
-	defer this.lockWs.Unlock()
-	return this.ws
-}
 
 func (this *Api) Auth() {
 	content := fmt.Sprintf(`{"action":"auth","id":%s,"key":"%s"}`, config.Config.Api.AppId, config.Config.Api.Key)
-	_, err := this.GetWs().Write([]byte(content))
+	this.sendData(content)
+}
+
+func (this *Api) Close(){
+	this.ws.Close()
+}
+
+func (this *Api) sendData(str string)  {
+	//this.lockWs.Lock()
+	//defer this.lockWs.Unlock()
+	_, err := this.ws.Write([]byte(str))
 	if err != nil {
-		glog.Error(err)
-		panic(err)
+		glog.Fatal(err)
 	}
 }
 
-func (this *Api) update(what , content string) {
+func (this *Api) update(what, content string) {
 	str := fmt.Sprintf(`{"action":"%s","content":"%s"}`, what, content)
-	_, err := this.GetWs().Write([]byte(str))
-	if err != nil {
-		glog.Error(err)
-		panic(err)
-	}
+	this.sendData(str)
 }
 
 func (this *Api) UpdateSipThread(user string) {
-	this.update("sip_thread",user)
+	this.update("sip_thread", user)
 }
 
 func (this *Api) UpdateWorkTime(user string) {
-	this.update("worktime",user)
+	this.update("worktime", user)
 }
 
 func (this *Api) UpdateTpl(id int) {
-	this.update("tpl",strconv.Itoa(id))
+	this.update("tpl", strconv.Itoa(id))
 }
 
 func (this *Api) UpdateSim(id int) {
@@ -49,23 +48,37 @@ func (this *Api) UpdateSim(id int) {
 }
 
 // request task by sim , the id is sim id
-func (this *Api)SimTasks(id int) {
+func (this *Api) SimTasks(id int) {
 	this.update("sim_tasks", strconv.Itoa(id))
 }
 
 // request task by sip , the id is sip id
-func (this *Api)SipTasks(id int) {
+func (this *Api) SipTasks(id int) {
 	this.update("sip_tasks", strconv.Itoa(id))
 }
 
-func (this *Api)TaskUser(taskId int) {
-	this.update("task_user", strconv.Itoa(taskId))
+func (this *Api) SimTaskUser(simId,taskId int) {
+	glog.V(2).Infoln("get sim task_user,sim id",simId,"task id",taskId)
+	str:=fmt.Sprintf(`{"action":"sim_task_user","task_id":%d, "type":"sim","id":%d}`,taskId,simId)
+	this.sendData(str)
 }
 
-func (this *Api)Tasks() map[int]*Task{
+func (this *Api) SipTaskUser(sipId,taskId int) {
+	this.app = this.app
+	str:=fmt.Sprintf(`{"action":"sip_task_user","task_id":%d, "type":"sip","id":%d}`,taskId,sipId)
+	this.sendData(str)
+}
+
+func (this *Api) Tasks() map[int]*Task {
 	this.app.lockTask.Lock()
-	this.app.lockTask.Unlock()
+	defer this.app.lockTask.Unlock()
 	return this.app.tasks
+}
+
+func (this *Api)GetTaskInfo()*TaskInfo{
+	this.app.lockTaskInfo.Lock()
+	defer this.app.lockTaskInfo.Unlock()
+	return this.app.taskInfo
 }
 
 //
@@ -96,8 +109,8 @@ func (this *Api)Tasks() map[int]*Task{
 //
 //// 根据网关获取电话卡列表
 //func (this *Api) GetSims(gatewayId int) (sims []Sim) {
-//	this.app.lockSim.Lock()
-//	defer this.app.lockSim.Unlock()
+//	this.app.lockSimFree.Lock()
+//	defer this.app.lockSimFree.Unlock()
 //
 //	for _, s := range this.app.Sims {
 //		sims = append(sims, s)
@@ -106,8 +119,8 @@ func (this *Api)Tasks() map[int]*Task{
 //}
 //
 //func (this *Api) GetAllSims() (sims []Sim) {
-//	this.app.lockSim.Lock()
-//	defer this.app.lockSim.Unlock()
+//	this.app.lockSimFree.Lock()
+//	defer this.app.lockSimFree.Unlock()
 //	for _, s := range this.app.Sims {
 //		sims = append(sims, s)
 //	}
@@ -116,8 +129,8 @@ func (this *Api)Tasks() map[int]*Task{
 //
 //// 根据卡编号获取卡信息
 //func (this *Api) GetSim(simId int) (sim Sim, ok bool) {
-//	this.app.lockSim.Lock()
-//	defer this.app.lockSim.Unlock()
+//	this.app.lockSimFree.Lock()
+//	defer this.app.lockSimFree.Unlock()
 //	sim, ok = this.app.Sims[simId]
 //	return
 //}

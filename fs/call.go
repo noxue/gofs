@@ -11,8 +11,11 @@ import (
 
 type CallInterface interface {
 	Create(call *Call)
+	Progress(call *Call)
+	ProgressMedia(call *Call)
 	Answer(call *Call)
 	Hangup(call *Call)
+	HangupComplete(call *Call)
 	Destroy(call *Call)
 	SpeakStart(call *Call)
 	SpeakEnd(call *Call)
@@ -33,19 +36,20 @@ type Call struct {
 	dataMapLock sync.Mutex
 
 	// store the record wav file path
-	records []string
+	records     []string
 	isRecording bool
 
 	// channel alive max time
 	timeout time.Duration
 }
 
-func NewCall(number string,callInterface CallInterface,timeout time.Duration) *Call{
+
+func NewCall(number string, callInterface CallInterface, timeout time.Duration) *Call {
 	return &Call{
-		number:number,
-		dataMap :make(map[string]interface{}),
-		callInterface:callInterface,
-		timeout:timeout,
+		number:        number,
+		dataMap:       make(map[string]interface{}),
+		callInterface: callInterface,
+		timeout:       timeout,
 	}
 }
 
@@ -57,17 +61,18 @@ func (this *Phone) MakeSipCall(gateway string, call *Call) (err error) {
 	call.client = this.client
 	this.calls.Set(call.GetNumber(), call)
 	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + gateway + "}sofia/gateway/" + gateway + "/" + call.GetNumber() + " 'ai:asdfaf' inline"))
+
 	return
 }
 
-func (this *Phone) MakeSimCall(from string, call *Call) (err error) {
+func (this *Phone) MakeSimCall(gateway, from string, call *Call) (err error) {
 	if len(call.GetNumber()) == 0 {
 		err = errors.New("gateway or number is empty")
 		return
 	}
 	call.client = this.client
 	this.calls.Set(call.GetNumber(), call)
-	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + from + "}sofia/internal/sip:"  + call.GetNumber() + " 'ai:asdfaf' inline"))
+	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + from + "}sofia/internal/sip:" + call.GetNumber() + "@" + gateway + " 'ai:asdfaf' inline"))
 	return
 }
 
@@ -160,7 +165,7 @@ func (this *Call) Stop() (err error) {
 	return
 }
 
-func (this *Call)record(wav string,flag bool) (err error) {
+func (this *Call) record(wav string, flag bool) (err error) {
 
 	if flag {
 		if len(this.GetUuid()) == 0 {
@@ -169,7 +174,7 @@ func (this *Call)record(wav string,flag bool) (err error) {
 		}
 		this.isRecording = true
 		this.records = append(this.records, wav)
-		this.client.BgApi("uuid_record " + this.GetUuid() + " start "+wav)
+		this.client.BgApi("uuid_record " + this.GetUuid() + " start " + wav)
 	} else {
 		this.isRecording = false
 		if len(this.records) == 0 {
@@ -177,24 +182,24 @@ func (this *Call)record(wav string,flag bool) (err error) {
 			return
 		}
 		wav = this.records[len(this.records)-1]
-		this.client.Api("uuid_record " + this.GetUuid() + " stop "+wav)
+		this.client.Api("uuid_record " + this.GetUuid() + " stop " + wav)
 	}
 	return
 }
 
-func (this *Call)Record(wav string) error {
-	return this.record(wav,true)
+func (this *Call) Record(wav string) error {
+	return this.record(wav, true)
 }
 
-func (this *Call)RecordStop() (string,error) {
-	err:=this.record("", false)
+func (this *Call) RecordStop() (string, error) {
+	err := this.record("", false)
 	if err != nil {
-		return "",err
+		return "", err
 	}
-	return this.records[len(this.records)-1],nil
+	return this.records[len(this.records)-1], nil
 }
 
-func (this *Call)Asr(on bool)(err error) {
+func (this *Call) Asr(on bool) (err error) {
 	if len(this.GetUuid()) == 0 {
 		err = errors.New("uuid is empty")
 		return
