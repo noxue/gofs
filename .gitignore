@@ -4,3 +4,4 @@ gophone.exe
 log
 data
 node_modules
+*.exe

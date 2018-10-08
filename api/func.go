@@ -14,7 +14,7 @@ import (
 func New(apiUrl, origin, appid, key string) *Api {
 
 	if appid == "" || key == "" {
-		glog.Error("robot id or key empty")
+		glog.Fatal("robot id or key empty")
 		return nil
 	}
 
@@ -38,9 +38,10 @@ func New(apiUrl, origin, appid, key string) *Api {
 	}
 
 	var err error
-	api.ws, err = websocket.Dial(apiUrl, "", origin)
+	api.ws, err = websocket.Dial(apiUrl+"?appid="+appid+"&key="+key, "", origin)
 	if err != nil {
 		log.Panic(err)
+		return nil
 	}
 	glog.Info("connect server success")
 
@@ -80,7 +81,7 @@ func (this *Api) Handle() {
 
 		if (result.Code != 0) {
 			glog.Error(result.Data)
-			return
+			continue
 		}
 
 		switch result.Action {

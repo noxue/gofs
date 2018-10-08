@@ -16,7 +16,7 @@ func (this *EndPoint) Create(call *fs.Call) {
 
 func (this *EndPoint) Answer(call *fs.Call) {
 	call.Asr(true)
-	call.Play("d:/0012.wav")
+	call.Play("d:/A1.wav")
 	fmt.Println("-------------------------------------------answer========================")
 }
 
