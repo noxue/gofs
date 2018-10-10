@@ -17,6 +17,8 @@ type CallInterface interface {
 	Hangup(call *Call)
 	HangupComplete(call *Call)
 	Destroy(call *Call)
+	PlaybackStart(call *Call)
+	PlaybackStop(call *Call)
 	SpeakStart(call *Call)
 	SpeakEnd(call *Call)
 }
@@ -61,7 +63,6 @@ func (this *Phone) MakeSipCall(gateway string, call *Call) (err error) {
 	call.client = this.client
 	this.calls.Set(call.GetNumber(), call)
 	this.client.BgApi(fmt.Sprintf("originate {ignore_early_media=true,absolute_codec_string=pcma,origination_caller_id_number=" + gateway + "}sofia/gateway/" + gateway + "/" + call.GetNumber() + " 'ai:asdfaf' inline"))
-
 	return
 }
 

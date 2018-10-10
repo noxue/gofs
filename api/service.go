@@ -1,12 +1,20 @@
 package api
 
 import (
+	"github.com/golang/glog"
 	"gofs/fs"
 	"fmt"
+	"gofs/tpl"
 	"math/rand"
 )
 
 type EndPoint struct {
+	IsPlay bool
+	Type string
+	Id int // simId or sipId
+	TaskId int
+	TaskUserId int
+	Tpl *tpl.Tpl
 }
 
 func (this *EndPoint) Create(call *fs.Call) {
@@ -35,6 +43,10 @@ func (this *EndPoint) Destroy(call *fs.Call) {
 			}
 		}
 	}
+
+	if this.Type=="sim"{
+		TaskApi.GetTaskInfo().SimFree(this.Id,true)
+	}
 }
 
 func (this *EndPoint) SpeakStart(call *fs.Call) {
@@ -59,4 +71,14 @@ func (this *EndPoint) ProgressMedia(call *fs.Call) {
 
 func (this *EndPoint) HangupComplete(call *fs.Call) {
 	fmt.Println(call.RecordStop())
+}
+
+func (this *EndPoint) PlaybackStart(call *fs.Call) {
+	this.IsPlay = true
+	glog.V(3).Info("================开始播放录音===================")
+}
+
+func (this *EndPoint) PlaybackStop(call *fs.Call) {
+	this.IsPlay = false
+	glog.V(3).Info("================停止播放录音===================")
 }

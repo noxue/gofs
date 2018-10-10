@@ -2,13 +2,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/golang/glog"
-	"log"
-	"golang.org/x/net/websocket"
-	"time"
-	"strconv"
 	"fmt"
+	"github.com/golang/glog"
 	"gofs/fs"
+	"gofs/tpl"
+	"golang.org/x/net/websocket"
+	"log"
+	"strconv"
+	"time"
 )
 
 func New(apiUrl, origin, appid, key string) *Api {
@@ -85,55 +86,40 @@ func (this *Api) Handle() {
 		}
 
 		switch result.Action {
-		case "NotAuth":
-			this.notAuth(&result)
-		case "AuthFinish":
-			this.auth(&result)
 		case "TplUpdate":
-			this.tplUpdate(&result)
+			go this.tplUpdate(&result)
 		case "TplDelete":
-			this.tplDelete(&result)
+			go this.tplDelete(&result)
 		case "GatewayUpdate":
-			this.gatewayUpdate(&result)
+			go this.gatewayUpdate(&result)
 		case "GatewaysUpdate":
-			this.gatewaysUpdate(&result)
+			go this.gatewaysUpdate(&result)
 		case "GatewayDelete":
-			this.gatewayDelete(&result)
+			go this.gatewayDelete(&result)
 		case "SimUpdate":
-			this.simUpdate(&result)
+			go this.simUpdate(&result)
 		case "SimDelete":
-			this.simDelete(&result)
+			go this.simDelete(&result)
 		case "TaskUpdate":
-			this.taskUpdate(&result)
+			go this.taskUpdate(&result)
 		case "TasksUpdate":
-			this.tasksUpdate(&result)
+			go this.tasksUpdate(&result)
 		case "TaskUserUpdate":
-			this.taskUserUpdate(&result)
+			go this.taskUserUpdate(&result)
 		case "TaskDelete":
-			this.taskDelete(&result)
+			go this.taskDelete(&result)
 		case "WorkTimeUpdate":
-			this.workTimeUpdate(&result)
+			go this.workTimeUpdate(&result)
 		case "SipThreadUpdate":
-			this.sipThreadUpdate(&result)
+			go this.sipThreadUpdate(&result)
 		}
 	}
 	return
 }
 
-func (this *Api) notAuth(result *Result) {
-	glog.Infoln("start authentication")
-	this.Auth()
-}
-
-func (this *Api) auth(result *Result) {
-	if result.Code != 0 {
-		glog.Error(result.Data)
-		panic(result.Data)
-	}
-	glog.Infoln("robot authenticationOk", result.Data)
-}
 
 func (this *Api) tplUpdate(result *Result) {
+
 	var tpl Template
 	err := json.Unmarshal([]byte(result.Data), &tpl)
 	if err != nil {
@@ -328,21 +314,39 @@ func (this *Api) taskUserUpdate(result *Result) {
 		glog.Error(err)
 		return
 	}
-	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user id:%d", taskUser.TaskId, taskUser.Id))
+
 	task := this.app.GetTask(taskUser.TaskId)
 	if task == nil {
 		glog.Error("task is not exists:", taskUser.Id)
 		return
 	}
 
+	t:= TaskApi.app.GetTpl(task.Template)
+
+
 	if userType == "sim" {
 		simId := int(m["sim_id"].(float64))
 		sim := this.app.GetSim(simId)
 		gateway := this.app.GetGateway(sim.Gid)
-		call := fs.NewCall(taskUser.Mobile, &EndPoint{}, time.Minute*5)
 
-		call.SetData("type", "sim")
-		call.SetData("sim_id", simId)
+		// if not found the template
+		if t == nil {
+			if userType == "sim" {
+				// free sim
+				TaskApi.GetTaskInfo().SimFree(simId, true)
+			}
+			return
+		}
+
+		t1,_:=tpl.New(t.Tpl,"","")
+		endpoint := &EndPoint{
+			Type:userType,
+			TaskId:task.Id,
+			TaskUserId:taskUser.Id,
+			Tpl:t1,
+		}
+
+		call := fs.NewCall(taskUser.Mobile, endpoint, time.Minute*5)
 
 		err := fs.Fs.MakeSimCall(gateway.Ip, sim.Number, call)
 		if err != nil {
@@ -355,6 +359,7 @@ func (this *Api) taskUserUpdate(result *Result) {
 
 	}
 
+	glog.Infoln(fmt.Sprintf("execute task:%d\ttask user id:%d", taskUser.TaskId, taskUser.Id))
 }
 
 func (this *Api) workTimeUpdate(result *Result) {

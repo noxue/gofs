@@ -1,5 +1,9 @@
 package api
 
+import (
+	"time"
+)
+
 func (this *App) GetTask(id int) *Task {
 	this.lockTask.Lock()
 	defer this.lockTask.Unlock()
@@ -31,11 +35,25 @@ func (this *App) GetSim(id int) *Sim {
 }
 
 func (this *App) GetTpl(id int) *Template {
+
+	n := 0
 	this.lockTemplate.Lock()
-	defer this.lockTemplate.Unlock()
 	tpl, ok := this.templates[id]
+	this.lockTemplate.Unlock()
+
 	if !ok {
-		return nil
+		TaskApi.UpdateTpl(id)
+
+	ReTry:
+		time.Sleep(time.Second)
+		tpl, ok = this.templates[id]
+		n++
+		if !ok{
+			if n<3{
+				goto ReTry
+			}
+			return nil
+		}
 	}
 	return tpl
 }

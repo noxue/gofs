@@ -36,13 +36,21 @@ func (this *Phone) Handle() {
 	client := this.client
 	go client.Handle()
 
-	this.client.Send("events json CHANNEL_CREATE CHANNEL_PROGRESS CHANNEL_PROGRESS_MEDIA CHANNEL_ANSWER CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE CUSTOM asr::start_speak asr::end_speak")
+	//this.client.Send("events json CHANNEL_UUID CHANNEL_CREATE CHANNEL_PROGRESS CHANNEL_PROGRESS_MEDIA CHANNEL_ANSWER CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_HANGUP_COMPLETE PLAYBACK_START PLAYBACK_STOP CUSTOM asr::start_speak asr::end_speak")
+	this.client.Send("event json CHANNEL_DESTROY")
+	//this.client.Send("event json CHANNEL_CREATE")
+	//this.client.Send("event json CHANNEL_ANSWER")
+	//this.client.Send("event json CHANNEL_HANGUP")
+	//this.client.Send("event json ALL")
+
 	for {
 		msg, err := client.ReadMessage()
 		if err != nil {
+			// If it contains EOF, we really dont care...
 			if !strings.Contains(err.Error(), "EOF") && err.Error() != "unexpected end of JSON input" {
-				glog.Error("Error while reading Freeswitch message: %s", err)
+				glog.Error("Error while reading Freeswitch message:", err)
 			}
+			break
 		}
 		if (msg == nil) {
 			continue
@@ -71,28 +79,36 @@ func (this *Phone) Handle() {
 				time.Sleep(call.timeout)
 				call.Hungup()
 			}()
-			call.callInterface.Create(call)
+			go call.callInterface.Create(call)
 		case "CHANNEL_PROGRESS":
-			call.callInterface.Progress(call)
+			go call.callInterface.Progress(call)
 		case "CHANNEL_PROGRESS_MEDIA":
-			call.callInterface.ProgressMedia(call)
+			go call.callInterface.ProgressMedia(call)
 		case "CHANNEL_ANSWER":
-			call.callInterface.Answer(call)
+			go call.callInterface.Answer(call)
 		case "CHANNEL_DESTROY":
-			call.callInterface.Destroy(call)
+			go call.callInterface.Destroy(call)
 		case "CHANNEL_HANGUP":
-			call.callInterface.Hangup(call)
+			go call.callInterface.Hangup(call)
 		case "CHANNEL_HANGUP_COMPLETE":
-			call.callInterface.HangupComplete(call)
+			go call.callInterface.HangupComplete(call)
+		case "PLAYBACK_START":
+			go call.callInterface.PlaybackStart(call)
+		case "PLAYBACK_STOP":
+			go call.callInterface.PlaybackStop(call)
 		case "asr::start_speak":
-			call.callInterface.SpeakStart(call)
+			go call.callInterface.SpeakStart(call)
 		case "asr::end_speak":
 			word := msg.GetHeader("Word")
 			file := msg.GetHeader("File")
 			call.SetData("word", word)
 			call.SetData("file", file)
-			call.callInterface.SpeakEnd(call)
+			go call.callInterface.SpeakEnd(call)
+
+		case "CHANNEL_UUID":
+			call.SetUuid(uuid)
 		}
+
 
 	}
 }
